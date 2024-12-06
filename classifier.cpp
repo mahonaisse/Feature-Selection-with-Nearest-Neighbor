@@ -25,7 +25,10 @@ void Classifier::read_file(const std::string & file_name) {
     std::string line;
     std::string word;
 
-    double element;
+    float element;
+    // Use variables to iterate through 2D data_ array. It is easier to read
+    // and use than having two for loops because we are also using a while loop
+    // to read line by line from the dataset text file.
     int row_iter = 0;
     int column_iter = 0;
     
@@ -43,16 +46,18 @@ void Classifier::read_file(const std::string & file_name) {
         ++number_of_rows_;
     }
 
-    // Create arrays of doubles based on sizes from iterated data.
+    // Create arrays of floats based on sizes from iterated data.
     // data_[rows Y][columns X]
-    data_ = new double*[number_of_rows_];
+    data_ = new float*[number_of_rows_];
+    normalized_data_ = new float*[number_of_rows_];
     
     for (int i = 0; i < number_of_rows_; ++i) {
-        data_[i] = new double[number_of_columns_];
+        data_[i] = new float[number_of_columns_];
+        normalized_data_[i] = new float[number_of_columns_];
     }
 
     feature_subset_indices_ = new int[number_of_columns_];
-    predicted_labels_ = new double[number_of_rows_];
+    predicted_labels_ = new float[number_of_rows_];
 
     // Return to start of reading file.
     file.clear();
@@ -65,8 +70,17 @@ void Classifier::read_file(const std::string & file_name) {
         column_iter = 0;
 
         while (s >> word) {
-            // Convert current string word into a double element.
+            // Convert current string word into a float element.
             element = std::stod(word);
+
+            // Check for minimum and maximum of dataset before increasing iterators.
+            // Do this now so we don't have to loop again later.
+            if (element < min_ || (row_iter == 0 && column_iter == 0)) {
+                min_ = element;
+            }
+            if (element > min_ || (row_iter == 0 && column_iter == 0)) {
+                max_ = element;
+            }
 
             data_[row_iter][column_iter] = element;
             ++column_iter;
@@ -75,12 +89,26 @@ void Classifier::read_file(const std::string & file_name) {
     }
 
     file.close();
+
+    std::cout << "The dataset has " << number_of_columns_ - 1 << " features with " << number_of_rows_
+              << " instances." << '\n';
+
+    std::cout << "Normalizing the data with a min of " << min_ << " and max of " << max_ << "... ";
+
+    for (int i = 0; i < number_of_rows_; ++i) {
+        normalized_data_[i][0] = data_[i][0];
+        for (int j = 1; j < number_of_columns_; ++j) {
+            normalized_data_[i][j] = (data_[i][j] - min_) / (max_ - min_);
+        }
+    }
+
+    std::cout << "Done!" << '\n';
+    
 };
 
 void Classifier::add_feature(const int & instance_number) {
     bool valid_instance = true;
-    bool print_first = true;
-
+    
     // Check if number falls within bounds of the dataset 1 to number of columns - 1.
     // The bounds begin at 1, because index 0 of the dataset are the features' labels.
     if (instance_number < 1 || number_of_columns_ - 1 < instance_number) {
@@ -101,31 +129,14 @@ void Classifier::add_feature(const int & instance_number) {
         feature_subset_indices_[feature_subset_size_] = instance_number;
         ++feature_subset_size_;
     }
-    
-    // Output feature subset. Do not output if the subset is empty.
-    if (feature_subset_size_ != 0) {
-        std::cout << "The feature subset consists of: {";
-        for (int i = 0; i < feature_subset_size_; ++i) {
-            if (print_first == false) {
-                std::cout << ", ";
-            }
-
-            std::cout << feature_subset_indices_[i];
-            print_first = false;
-        }
-        std::cout << "}" << '\n';
-    }
 };
 
-void Classifier::run_algorithm() {
-    double distance = 0;
-    double closest_distance = 0;
+void Classifier::run_NN_algorithm() {
+    float distance = 0;
+    float closest_distance = 0;
     int closest_feature_index = -1;
 
-    // Use for printing commas while printing an array.
-    bool print_first = true;
-
-    double number_of_correct_labels = 0;
+    float number_of_correct_labels = 0;
 
     if (feature_subset_size_ == 0) {
         std::cout << "There are no features in the feature subset to run NN algorithm on." << '\n';
@@ -146,7 +157,7 @@ void Classifier::run_algorithm() {
                 // Calculate Euclidean distance between current instance i and iterated instance j.
                 // Use only certain features for instances i and j.
                 for (int k = 0; k < feature_subset_size_; ++k) {
-                    distance += pow(data_[i][feature_subset_indices_[k]] - data_[j][feature_subset_indices_[k]], 2);
+                    distance += pow(normalized_data_[i][feature_subset_indices_[k]] - normalized_data_[j][feature_subset_indices_[k]], 2);
                 }
 
                 distance = sqrt(distance);
@@ -157,31 +168,8 @@ void Classifier::run_algorithm() {
                 }
             }
         }
-        predicted_labels_[i] = data_[closest_feature_index][0];
+        predicted_labels_[i] = normalized_data_[closest_feature_index][0];
     }
-
-    // Output feature subset.
-    std::cout << "Using a feature subset of {";
-    for (int i = 0; i < feature_subset_size_; ++i) {
-        if (print_first == false) {
-            std::cout << ", ";
-        }
-
-        std::cout << feature_subset_indices_[i];
-        print_first = false;
-    }
-    std::cout << "}, we get predicted labels:" << '\n';
-
-    // Output predicted labels.
-    for (int i = 0; i < number_of_rows_; ++i) {
-        std::cout << predicted_labels_[i] << " ";
-
-        // Add a space every 25 labels for better readability.
-        if ((i + 1) % 25 == 0 && i != 0) {
-            std::cout << '\n';
-        }
-    }
-    std::cout << '\n';
 
     // Count the number of correct labels.
     for (int i = 0; i < number_of_rows_; ++i) {
@@ -189,9 +177,5 @@ void Classifier::run_algorithm() {
             ++number_of_correct_labels;
         }
     }
-
-    // Output the number and percentage of correct labels.
     accuracy_ = number_of_correct_labels / number_of_rows_;
-    std::cout << "There are " << number_of_correct_labels << " out of a total of " << number_of_rows_
-              << " instances for an accuracy of " << accuracy_ << "." << '\n';
 };

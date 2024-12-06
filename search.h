@@ -4,8 +4,19 @@
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+#include <chrono>
+
+#include "classifier.h"
 
 class Search {
+    public:
+        // Constructor creates arrays based on passed in int.
+        // feature_set_ and result_set_ are double pointers to dynamically
+        // allocate array size.
+        Search(const std::string &);
+
+        void run_forward_selection();
+        void run_backward_elimination();
     private:
         struct Feature {
             int feature_number;
@@ -14,28 +25,10 @@ class Search {
             Feature(int number) : feature_number(number) {}
         };
 
-    public:
-        // Constructor creates arrays based on passed in int.
-        // feature_set_ and result_set_ are double pointers to dynamically
-        // allocate array size.
-        Search(int number_of_features) : total_number_of_features_(number_of_features),
-                                         subset_accuracy(0) {
-            feature_set_ = new Feature*[number_of_features];
-            result_set_ = new Feature*[number_of_features];
+        Classifier* classifier_;
 
-            // Using Feature struct constructor, feature_number
-            // is the same as their index in feature_set_.
-            for (int i = 0; i < number_of_features; ++i) {
-                feature_set_[i] = new Feature(i);
-                result_set_[i] = nullptr;
-            }
-        }
-
-        void forward_selection();
-        void backward_eliminiation();
-    private:
         int total_number_of_features_;
-        float subset_accuracy;
+        float subset_accuracy_;
 
         Feature** feature_set_;
         Feature** result_set_;

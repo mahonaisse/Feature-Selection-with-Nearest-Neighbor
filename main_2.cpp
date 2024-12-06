@@ -43,7 +43,7 @@ int main() {
 
                 break;
             case 2:
-                classifier.run_algorithm();
+                classifier.run_NN_algorithm();
 
                 break;
         }
